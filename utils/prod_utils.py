@@ -5,7 +5,6 @@ import json
 import os
 from pathlib import Path
 from .jobfcl import Mu2eJobFCL
-from .jobdef import create_jobdef
 
 def setup_logging(verbose: bool) -> None:
     logging.basicConfig(
@@ -217,13 +216,15 @@ def parse_jobdef_fields(jobdefs_file, index=None):
         tuple: (tarfile, job_index, inloc, outloc)
     """
 
-    #check token before proceeding
-    try:
-        run(f"httokendecode -H", shell=True)
-    except SystemExit:
-        print("Warning: Token validation failed. Please check your token.")
-    run("pwd", shell=True)
-    run("ls -ltr", shell=True)
+    # Optional debug noise, enable with environment variable PRODTOOLS_DEBUG=1
+    debug = os.getenv("PRODTOOLS_DEBUG") == "1"
+    if debug:
+        try:
+            run("httokendecode -H", shell=True)
+        except SystemExit:
+            print("Warning: Token validation failed. Please check your token.")
+        run("pwd", shell=True)
+        run("ls -ltr", shell=True)
 
     # Extract index from fname environment variable if not provided
     if index is None:
@@ -243,13 +244,14 @@ def parse_jobdef_fields(jobdefs_file, index=None):
     
     jobdefs_list = make_jobdefs_list(Path(jobdefs_file))
     
-    if len(jobdefs_list) < index:
-        print(f"Error: Expected at least {index} job definitions, but got only {len(jobdefs_list)}")
+    if index < 0 or index >= len(jobdefs_list):
+        print(f"Error: Index {index} out of range; {len(jobdefs_list)} definitions available.")
         sys.exit(1)
     
     # Get the index-th job definition (adjusting for Python's 0-index).
     jobdef = jobdefs_list[index]
-    print(f"The {index}th job definition is: {jobdef}")
+    if debug:
+        print(f"The {index}th job definition is: {jobdef}")
 
     # Split the job definition into fields (parfile job_index inloc outloc).
     fields = jobdef.split()
@@ -258,7 +260,8 @@ def parse_jobdef_fields(jobdefs_file, index=None):
         sys.exit(1)
 
     # Return the fields: (tarfile, job_index, inloc, outloc)
-    print(f"IND={fields[1]} TARF={fields[0]} INLOC={fields[2]} OUTLOC={fields[3]}")
+    if debug:
+        print(f"IND={fields[1]} TARF={fields[0]} INLOC={fields[2]} OUTLOC={fields[3]}")
     return fields[0], int(fields[1]), fields[2], fields[3]
 
 def make_jobdefs_list(input_file):
@@ -275,9 +278,19 @@ def make_jobdefs_list(input_file):
         sys.exit(f"Input file not found: {input_file}")
     
     jobdefs_list = []
-    for line in input_file.read_text().splitlines():
-        parfile, njobs, inloc, outloc = line.strip().split()
-        for i in range(int(njobs)):
+    for raw_line in input_file.read_text().splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#"):
+            continue
+        parts = line.split()
+        if len(parts) != 4:
+            sys.exit(f"Invalid line in {input_file}: '{raw_line}'. Expected 4 fields.")
+        parfile, njobs_str, inloc, outloc = parts
+        try:
+            njobs = int(njobs_str)
+        except ValueError:
+            sys.exit(f"Invalid njobs value '{njobs_str}' in {input_file} line: '{raw_line}'")
+        for i in range(njobs):
             jobdefs_list.append(f"{parfile} {i} {inloc} {outloc}")
     print(f"Generated the list of {len(jobdefs_list)} jobdefs from {input_file}")
     return jobdefs_list
