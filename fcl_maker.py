@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 import os, sys
 # Allow running this file directly: make package root importable
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import argparse
-from utils.prod_utils import *
+from utils.prod_utils import write_fcl, run
 
 def main():
     p = argparse.ArgumentParser(description='Generate FCL from dataset name or target file')

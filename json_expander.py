@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import os, sys
 # Allow running this file directly: make package root importable
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import argparse
 import json

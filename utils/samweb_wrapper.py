@@ -10,7 +10,7 @@ from typing import List, Dict, Optional, Union
 try:
     from samweb_client import SAMWebClient
 except ImportError:
-    print("Warning: samweb_client module not available. Please set it up in your environment.")
+    print("Warning: samweb_client module not available. Please set it up in your environment.", file=sys.stderr)
     SAMWebClient = None
 
 class SAMWebWrapper:
@@ -31,7 +31,7 @@ class SAMWebWrapper:
             print(f"Error counting files: {e}")
             return 0
     
-    def list_files(self, query: str, summary: bool = False) -> List[str]:
+    def list_files(self, query: str, summary: bool = False) -> Union[List[str], Dict]:
         """List files matching a query (equivalent to samweb list-files)."""
         try:
             if summary:
@@ -42,7 +42,7 @@ class SAMWebWrapper:
             print(f"Error listing files: {e}")
             return []
     
-    def locate_file(self, filename: str) -> str:
+    def locate_file(self, filename: str) -> Union[str, Dict]:
         """Locate a file (equivalent to samweb locate-file)."""
         try:
             locations = self.client.locateFile(filename)
@@ -145,11 +145,11 @@ def count_files(query: str) -> int:
     """Count files matching a query."""
     return get_samweb_wrapper().count_files(query)
 
-def list_files(query: str, summary: bool = False) -> List[str]:
+def list_files(query: str, summary: bool = False) -> Union[List[str], Dict]:
     """List files matching a query."""
     return get_samweb_wrapper().list_files(query, summary)
 
-def locate_file(filename: str) -> str:
+def locate_file(filename: str) -> Union[str, Dict]:
     """Locate a file."""
     return get_samweb_wrapper().locate_file(filename)
 
