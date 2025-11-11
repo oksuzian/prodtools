@@ -11,8 +11,6 @@ import sys
 import tarfile
 from pathlib import Path
 from typing import Dict, List, Optional, Union
-import hashlib
-import re
 
 from .job_common import Mu2eFilename, Mu2eJobBase
 
@@ -24,9 +22,6 @@ class Mu2eJobIO(Mu2eJobBase):
         super().__init__(jobdef)
         self.json_data = self._extract_json()
     
-
-    
-
     
     def job_primary_inputs(self, index: int) -> Dict[str, List[str]]:
         """Get primary input files for job index."""

@@ -188,13 +188,11 @@ def parse_jobdef_fields(jobdefs_file, index=None):
         tuple: (tarfile, job_index, inloc, outloc)
     """
 
-    #check token before proceeding
+    # Check token before proceeding
     try:
         run(f"httokendecode -H", shell=True)
     except SystemExit:
         print("Warning: Token validation failed. Please check your token.")
-    run("pwd", shell=True)
-    run("ls -ltr", shell=True)
 
     # Extract index from fname environment variable if not provided
     if index is None:

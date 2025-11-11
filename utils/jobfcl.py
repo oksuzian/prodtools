@@ -31,8 +31,8 @@ class Mu2eJobFCL(Mu2eJobBase):
         
         # Extract owner and dsconf directly from JSON fields
         # Use same default logic as mu2ejobdef.py for consistency
-        default_owner = os.getenv('USER', 'mu2e').replace('mu2epro', 'mu2e')
-        self.owner = self.json_data.get('owner', default_owner)
+        from .job_common import get_owner
+        self.owner = get_owner(self.json_data)
         self.dsconf = self.json_data.get('dsconf', 'unknown')
         
         # Read sequential_aux setting from job definition, default to False if not specified
@@ -75,9 +75,9 @@ class Mu2eJobFCL(Mu2eJobBase):
         if not location:
             raise ValueError(f"Could not locate file: {filename}")
         
-        # Handle case where locate_file returns a dict
+        # Handle dict location (extract path)
         if isinstance(location, dict):
-            path = location.get('location', location.get('path', ''))
+            path = location.get('location') or location.get('path')
             if not path:
                 raise ValueError(f"Could not determine location for file: {filename}")
             return path
@@ -278,8 +278,7 @@ class Mu2eJobFCL(Mu2eJobBase):
         for key, template in outfiles.items():
             # The template may still contain placeholders that need to be resolved
             # Replace placeholders with actual values
-            resolved_template = template
-            resolved_template = resolved_template.replace('.owner.', f'.{self.owner}.')
+            resolved_template = template.replace('.owner.', f'.{self.owner}.')
             resolved_template = resolved_template.replace('.version.', f'.{self.dsconf}.')
             resolved_template = resolved_template.replace('.sequencer.', f'.{seq}.')
             
