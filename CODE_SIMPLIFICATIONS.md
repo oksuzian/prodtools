@@ -74,11 +74,70 @@ This document summarizes the code simplifications made to improve maintainabilit
 
 **Impact:** More concise placeholder replacement.
 
+## Additional Cleanup (Round 2)
+
+### 10. Removed Unused Imports (`utils/jobiodetail.py`)
+
+**Before:** Imported `hashlib` and `re` but never used them (functionality already in `job_common.py`).
+
+**After:** Removed unused imports.
+
+**Impact:** Cleaner imports and reduced confusion.
+
+### 11. Extracted Owner Extraction Logic (`utils/job_common.py`, `utils/jobdef.py`, `utils/jobfcl.py`, `utils/json2jobdef.py`)
+
+**Before:** Owner extraction logic duplicated in 4+ places with the same pattern: `config.get('owner') or os.getenv('USER', 'mu2e').replace('mu2epro', 'mu2e')`.
+
+**After:** Created `get_owner()` function in `job_common.py` and used it consistently across all files.
+
+**Impact:** Single source of truth for owner extraction, easier to maintain.
+
+### 12. Simplified Location Handling (`utils/jobfcl.py`)
+
+**Before:** Complex nested conditionals for extracting path from dict location.
+
+**After:** Simplified to use `or` operator: `location.get('location') or location.get('path')`.
+
+**Impact:** More Pythonic and readable code.
+
+### 13. Removed Redundant Checks (`utils/jobdef.py`)
+
+**Before:** Checks like `mod and mod != ''` were redundant (empty strings are falsy in Python).
+
+**After:** Simplified to just `mod` (falsy check handles empty strings).
+
+**Impact:** Cleaner conditionals.
+
+### 14. Simplified Setup Argument Logic (`utils/jobdef.py`)
+
+**Before:** Used ternary operator with `or` fallback: `setup_arg = '--setup' if config.get('simjob_setup') else '--code'` followed by `setup_val = config.get('simjob_setup') or config.get('code')`.
+
+**After:** Direct if-else with explicit values.
+
+**Impact:** More explicit and easier to understand.
+
+### 15. Simplified String Checks (`utils/jobdef.py`)
+
+**Before:** Redundant checks like `filename_pattern and filename_pattern.strip()`.
+
+**After:** Simplified to just `filename_pattern.strip()` (empty strings return empty string from strip, which is falsy).
+
+**Impact:** Cleaner conditionals.
+
+### 16. Removed Blank Lines (`utils/jobiodetail.py`)
+
+**Before:** Multiple blank lines in `__init__` method.
+
+**After:** Cleaned up formatting.
+
+**Impact:** Better code formatting.
+
 ## Summary Statistics
 
-- **Files Modified:** 5 (`jobdef.py`, `prod_utils.py`, `json2jobdef.py`, `mixing_utils.py`, `jobfcl.py`)
-- **Functions Extracted:** 2 (`_reorder_dict()`, `_replace_placeholders()`)
-- **Lines Removed:** ~50+ lines of duplicate/complex code
-- **Complexity Reduced:** Multiple nested conditionals and try-except blocks simplified
+- **Files Modified:** 6 (`jobdef.py`, `prod_utils.py`, `json2jobdef.py`, `mixing_utils.py`, `jobfcl.py`, `jobiodetail.py`, `job_common.py`)
+- **Functions Extracted:** 3 (`_reorder_dict()`, `_replace_placeholders()`, `get_owner()`)
+- **Lines Removed:** ~70+ lines of duplicate/complex code
+- **Complexity Reduced:** Multiple nested conditionals, try-except blocks, and redundant checks simplified
+- **Unused Imports Removed:** 2 (`hashlib`, `re` from `jobiodetail.py`)
 
 All changes maintain backward compatibility and preserve existing functionality while improving code quality and maintainability.

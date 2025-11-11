@@ -25,7 +25,7 @@ from pathlib import Path
 import tarfile
 from typing import Dict, List, Tuple, Optional, Any
 
-from utils.job_common import Mu2eFilename
+from utils.job_common import Mu2eFilename, get_owner as _get_owner_base
 
 # Constants matching Perl mu2ejobdef exactly
 FILENAME_JSON = 'jobpars.json'
@@ -143,7 +143,7 @@ def _get_output_modules(template_path: str) -> List[str]:
     # Perl: my @active_outmods = grep { $endmodules{$_} } @all_outmods;
     active_outmods = []
     for mod in all_outmods:
-        if mod and mod != '' and mod in endmodules:
+        if mod and mod in endmodules:
             active_outmods.append(mod)
     
     return active_outmods
@@ -184,6 +184,11 @@ def _validate_fcl_template(template_path: str) -> None:
         raise ValueError(f"FCL template missing required physics sections: {missing_keys}")
 
 
+def _get_owner(config: Dict) -> str:
+    """Extract owner from config or environment, with mu2epro -> mu2e replacement."""
+    return _get_owner_base(config)
+
+
 def _reorder_dict(d: Dict, order: List[str]) -> Dict:
     """Reorder dictionary keys according to specified order, preserving remaining keys."""
     ordered = {}
@@ -199,7 +204,7 @@ def _reorder_dict(d: Dict, order: List[str]) -> Dict:
 
 def _build_jobpars_json(config: Dict, tbs: Dict, code: str = "", template_path: str = "") -> Dict:
     """Construct complete jobpars.json structure matching Perl mu2ejobdef exactly."""
-    owner = config.get('owner') or os.getenv('USER', 'mu2e').replace('mu2epro', 'mu2e')
+    owner = _get_owner(config)
     desc = config['desc']
     dsconf = config['dsconf']
     
@@ -423,15 +428,15 @@ def _parse_job_args(job_args: List[str], template_path: str, config: Dict = None
         outfiles = {}
         
         for mod in output_modules:
-            if mod and mod != '':  # skip empty entries
+            if mod:  # skip empty entries
                 output_key = f'outputs.{mod}.fileName'
                 
                 # Get template from FCL file (like Perl does)
                 filename_pattern = _get_fcl_value(template_path, output_key)
                 
-                if filename_pattern and filename_pattern.strip():
+                if filename_pattern.strip():
                     # Do placeholder replacement like Perl does
-                    owner = config.get("owner", "mu2e")
+                    owner = _get_owner(config)
                     replaced_pattern = _replace_placeholders(filename_pattern, owner, config["dsconf"])
                     outfiles[output_key] = replaced_pattern
                 else:
@@ -444,9 +449,9 @@ def _parse_job_args(job_args: List[str], template_path: str, config: Dict = None
     # Handle TFileService (like Perl's separate TFileService handling)
     try:
         tfileservice_filename = _get_fcl_value(template_path, 'services.TFileService.fileName')
-        if tfileservice_filename and tfileservice_filename.strip() != '/dev/null':
+        if tfileservice_filename.strip() and tfileservice_filename.strip() != '/dev/null':
             # Do placeholder replacement like Perl does
-            owner = config.get("owner", "mu2e")
+            owner = _get_owner(config)
             replaced_pattern = _replace_placeholders(tfileservice_filename, owner, config["dsconf"])
             
             # Add to outfiles (Perl adds it to %outtable)
@@ -485,7 +490,7 @@ def create_jobdef(config: Dict, fcl_path: str = 'template.fcl', job_args: List[s
     - Processes all source types, output files, seeds, etc.
     - Returns Path to the created file
     """
-    owner = config.get('owner') or os.getenv('USER', 'mu2e').replace('mu2epro', 'mu2e')
+    owner = _get_owner(config)
     
     # Handle auto-description
     if config.get('auto_description') is not None:
@@ -536,9 +541,10 @@ def create_jobdef(config: Dict, fcl_path: str = 'template.fcl', job_args: List[s
     cmd_parts = ['mu2ejobdef']
     
     # Add setup or code argument
-    setup_arg = '--setup' if config.get('simjob_setup') else '--code'
-    setup_val = config.get('simjob_setup') or config.get('code')
-    cmd_parts.extend([setup_arg, setup_val])
+    if config.get('simjob_setup'):
+        cmd_parts.extend(['--setup', config['simjob_setup']])
+    else:
+        cmd_parts.extend(['--code', config['code']])
     
     # Add required arguments
     cmd_parts.extend([

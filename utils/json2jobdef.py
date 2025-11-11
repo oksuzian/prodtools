@@ -18,6 +18,7 @@ from utils.prod_utils import *
 from utils.mixing_utils import *
 from utils.jobquery import Mu2eJobPars
 from utils.jobdef import create_jobdef
+from utils.job_common import get_owner as _get_owner
 
 def _create_inputs_file(dataset):
     """Helper: create inputs.txt file from dataset."""
@@ -246,7 +247,7 @@ def main():
 def process_single_entry(config, json_output=True, pushout=False, no_cleanup=True, jobdefs_list=None):
     """Process a single configuration entry (original behavior)"""
     validate_required_fields(config)
-    config['owner'] = config.get('owner', os.getenv('USER', 'mu2e').replace('mu2epro', 'mu2e'))
+    config['owner'] = _get_owner(config)
     config['inloc'] = config.get('inloc', 'none')
     config['njobs'] = config.get('njobs', -1)
     

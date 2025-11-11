@@ -103,6 +103,15 @@ class Mu2eJobBase:
         return int(h.hexdigest()[:8], 16)
 
 
+def get_owner(config_or_dict: dict) -> str:
+    """Extract owner from config or environment, with mu2epro -> mu2e replacement.
+    
+    Can be used with either a config dict (from jobdef) or a JSON data dict (from jobfcl).
+    """
+    import os
+    return config_or_dict.get('owner') or os.getenv('USER', 'mu2e').replace('mu2epro', 'mu2e')
+
+
 def setup_script_path():
     """Standard setup for direct script execution.
     
