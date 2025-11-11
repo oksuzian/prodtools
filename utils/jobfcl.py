@@ -278,8 +278,7 @@ class Mu2eJobFCL(Mu2eJobBase):
         for key, template in outfiles.items():
             # The template may still contain placeholders that need to be resolved
             # Replace placeholders with actual values
-            resolved_template = template
-            resolved_template = resolved_template.replace('.owner.', f'.{self.owner}.')
+            resolved_template = template.replace('.owner.', f'.{self.owner}.')
             resolved_template = resolved_template.replace('.version.', f'.{self.dsconf}.')
             resolved_template = resolved_template.replace('.sequencer.', f'.{seq}.')
             

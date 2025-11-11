@@ -130,23 +130,14 @@ def _get_output_modules(template_path: str) -> List[str]:
             continue
         
         # Get modules in this end path
-        # Handle both cases: end_paths contains names or values
         try:
             mods = _run_fhicl_get(template_path, '--sequence-of', f'physics.{ep}').split('\n')
             for m in mods:
                 if m:  # Skip empty entries
                     endmodules.add(m)
         except:
-            # If this fails, the end path name might be the actual end path
-            # Try to get modules directly from the end path name
-            try:
-                mods = _run_fhicl_get(template_path, '--sequence-of', f'physics.{ep}').split('\n')
-                for m in mods:
-                    if m:  # Skip empty entries
-                        endmodules.add(m)
-            except:
-                # If both fail, skip this end path
-                continue
+            # If this fails, skip this end path
+            continue
     
     # Only return output modules that are in active end paths
     # Perl: my @active_outmods = grep { $endmodules{$_} } @all_outmods;
@@ -161,6 +152,15 @@ def _get_output_modules(template_path: str) -> List[str]:
 def _get_fcl_value(template_path: str, key: str) -> str:
     """Get FCL parameter value."""
     return _run_fhicl_get(template_path, '--atom-as', key)
+
+
+def _replace_placeholders(pattern: str, owner: str, dsconf: str) -> str:
+    """Replace placeholders in filename pattern with actual values."""
+    result = pattern.strip()
+    result = result.replace('.owner.', f'.{owner}.')
+    result = result.replace('.version.', f'.{dsconf}.')
+    result = result.replace('configuration', dsconf)
+    return result
 
 
 def _validate_fcl_template(template_path: str) -> None:
@@ -184,6 +184,19 @@ def _validate_fcl_template(template_path: str) -> None:
         raise ValueError(f"FCL template missing required physics sections: {missing_keys}")
 
 
+def _reorder_dict(d: Dict, order: List[str]) -> Dict:
+    """Reorder dictionary keys according to specified order, preserving remaining keys."""
+    ordered = {}
+    for key in order:
+        if key in d:
+            ordered[key] = d[key]
+    # Add any remaining keys not in the standard order
+    for key, value in d.items():
+        if key not in ordered:
+            ordered[key] = value
+    return ordered
+
+
 def _build_jobpars_json(config: Dict, tbs: Dict, code: str = "", template_path: str = "") -> Dict:
     """Construct complete jobpars.json structure matching Perl mu2ejobdef exactly."""
     owner = config.get('owner') or os.getenv('USER', 'mu2e').replace('mu2epro', 'mu2e')
@@ -194,18 +207,7 @@ def _build_jobpars_json(config: Dict, tbs: Dict, code: str = "", template_path: 
     jobname = f"cnf.{owner}.{desc}.{dsconf}.0.tar"
 
     # Reorder TBS fields to match Perl exactly: seed, subrunkey, event_id, outfiles
-    # Reorder TBS fields to match Perl exactly: seed, subrunkey, event_id, outfiles
-    ordered_tbs = {}
-    perl_tbs_order = ['seed', 'subrunkey', 'event_id', 'outfiles']
-    
-    for key in perl_tbs_order:
-        if key in tbs:
-            ordered_tbs[key] = tbs[key]
-    
-    # Add any remaining keys not in the standard order
-    for key, value in tbs.items():
-        if key not in ordered_tbs:
-            ordered_tbs[key] = value
+    ordered_tbs = _reorder_dict(tbs, ['seed', 'subrunkey', 'event_id', 'outfiles'])
 
     # Base structure - use Perl field ordering exactly: code, setup, tbs, jobname
     # This matches the actual observed Perl output order
@@ -266,35 +268,23 @@ def _validate_options_for_source_type(source_type: str, args_state: Dict) -> Non
     # Check required options (matching Perl's nonempty() logic)
     for option in rule['required']:
         if option == 'description':
-            # Description is always available from config
-            continue
-        elif option == 'samplinginput':
-            # Check if sampling is non-empty
-            if not args_state.get('sampling'):
-                raise ValueError(f"Error: --samplinginput must be specified and nonempty for fcl files that use source type {source_type}.")
-        elif option == 'inputs':
-            # Check if inputs list is non-empty
-            if not args_state.get('inputs_list'):
-                raise ValueError(f"Error: --inputs must be specified and nonempty for fcl files that use source type {source_type}.")
-        elif option == 'merge_factor':
-            # Check if merge_factor is positive
-            if not args_state.get('merge_factor') or args_state['merge_factor'] <= 0:
-                raise ValueError(f"Error: --merge-factor must be specified and positive for fcl files that use source type {source_type}.")
-        elif option == 'run_number':
-            # Check if run_number is specified
-            if args_state.get('run_number') is None:
-                raise ValueError(f"Error: --run-number must be specified for fcl files that use source type {source_type}.")
-        elif option == 'events_per_job':
-            # Check if events_per_job is specified
-            if args_state.get('events_per_job') is None:
-                raise ValueError(f"Error: --events-per-job must be specified for fcl files that use source type {source_type}.")
+            continue  # Always available from config
+        elif option == 'samplinginput' and not args_state.get('sampling'):
+            raise ValueError(f"Error: --samplinginput must be specified and nonempty for fcl files that use source type {source_type}.")
+        elif option == 'inputs' and not args_state.get('inputs_list'):
+            raise ValueError(f"Error: --inputs must be specified and nonempty for fcl files that use source type {source_type}.")
+        elif option == 'merge_factor' and (not args_state.get('merge_factor') or args_state['merge_factor'] <= 0):
+            raise ValueError(f"Error: --merge-factor must be specified and positive for fcl files that use source type {source_type}.")
+        elif option == 'run_number' and args_state.get('run_number') is None:
+            raise ValueError(f"Error: --run-number must be specified for fcl files that use source type {source_type}.")
+        elif option == 'events_per_job' and args_state.get('events_per_job') is None:
+            raise ValueError(f"Error: --events-per-job must be specified for fcl files that use source type {source_type}.")
     
     # Check for incompatible options (matching Perl's veto logic)
     for option in all_options:
         if option in rule['required'] or option in rule['allowed']:
             continue
         
-        # Check if this incompatible option is present and non-empty
         if option == 'samplinginput' and args_state.get('sampling'):
             raise ValueError(f"Error: --samplinginput is not compatible with fcl files that use source type {source_type}.")
         elif option == 'inputs' and args_state.get('inputs_list'):
@@ -357,6 +347,15 @@ def _parse_job_args(job_args: List[str], template_path: str, config: Dict = None
         '--include': lambda: ('include', next(it))
     }
     
+    # Map argument names to state keys for simple assignments
+    simple_arg_map = {
+        '--inputs': 'inputs_list',
+        '--merge-factor': 'merge_factor', 
+        '--run-number': 'run_number',
+        '--events-per-job': 'events_per_job',
+        '--outdir': 'outdir'
+    }
+    
     for token in it:
         if token in arg_handlers:
             result = arg_handlers[token]()
@@ -370,17 +369,8 @@ def _parse_job_args(job_args: List[str], template_path: str, config: Dict = None
                 args_state['fcl_mode'], args_state['fcl_template'] = result
             elif token == '--override-output-description':
                 args_state['override_output_description'] = result
-            else:
-                # Map argument names to state keys
-                key_map = {
-                    '--inputs': 'inputs_list',
-                    '--merge-factor': 'merge_factor', 
-                    '--run-number': 'run_number',
-                    '--events-per-job': 'events_per_job',
-                    '--outdir': 'outdir'
-                }
-                if token in key_map:
-                    args_state[key_map[token]] = result
+            elif token in simple_arg_map:
+                args_state[simple_arg_map[token]] = result
 
     # Determine source type using the resolved template path (like Perl's $templateresolved)
     source_type = _get_source_type(template_path)
@@ -441,12 +431,8 @@ def _parse_job_args(job_args: List[str], template_path: str, config: Dict = None
                 
                 if filename_pattern and filename_pattern.strip():
                     # Do placeholder replacement like Perl does
-                    # Use more specific replacement to avoid partial matches
-                    replaced_pattern = filename_pattern.strip()
-                    replaced_pattern = replaced_pattern.replace('.owner.', f'.{config.get("owner", "mu2e")}.')
-                    replaced_pattern = replaced_pattern.replace('.version.', f'.{config["dsconf"]}.')
-                    # Also replace 'configuration' literal string like Perl does
-                    replaced_pattern = replaced_pattern.replace('configuration', config["dsconf"])
+                    owner = config.get("owner", "mu2e")
+                    replaced_pattern = _replace_placeholders(filename_pattern, owner, config["dsconf"])
                     outfiles[output_key] = replaced_pattern
                 else:
                     # No template pattern found - this shouldn't happen in a properly resolved template
@@ -458,13 +444,10 @@ def _parse_job_args(job_args: List[str], template_path: str, config: Dict = None
     # Handle TFileService (like Perl's separate TFileService handling)
     try:
         tfileservice_filename = _get_fcl_value(template_path, 'services.TFileService.fileName')
-        if tfileservice_filename and tfileservice_filename.strip() and tfileservice_filename.strip() != '/dev/null':
+        if tfileservice_filename and tfileservice_filename.strip() != '/dev/null':
             # Do placeholder replacement like Perl does
-            replaced_pattern = tfileservice_filename.strip()
-            replaced_pattern = replaced_pattern.replace('.owner.', f'.{config.get("owner", "mu2e")}.')
-            replaced_pattern = replaced_pattern.replace('.version.', f'.{config["dsconf"]}.')
-            # Also replace 'configuration' literal string like Perl does
-            replaced_pattern = replaced_pattern.replace('configuration', config["dsconf"])
+            owner = config.get("owner", "mu2e")
+            replaced_pattern = _replace_placeholders(tfileservice_filename, owner, config["dsconf"])
             
             # Add to outfiles (Perl adds it to %outtable)
             if 'outfiles' not in tbs:
@@ -489,17 +472,7 @@ def _parse_job_args(job_args: List[str], template_path: str, config: Dict = None
         tbs['sequential_aux'] = config['sequential_aux']
 
     # Reorder TBS to match Perl order: outfiles, subrunkey, auxin, inputs, event_id, seed
-    ordered_tbs = {}
-    perl_order = ['outfiles', 'subrunkey', 'auxin', 'inputs', 'event_id', 'seed', 'samplinginput']
-    
-    for key in perl_order:
-        if key in tbs:
-            ordered_tbs[key] = tbs[key]
-    
-    # Add any remaining keys not in the standard order
-    for key, value in tbs.items():
-        if key not in ordered_tbs:
-            ordered_tbs[key] = value
+    ordered_tbs = _reorder_dict(tbs, ['outfiles', 'subrunkey', 'auxin', 'inputs', 'event_id', 'seed', 'samplinginput'])
 
     return ordered_tbs, None, args_state['override_output_description']
 
@@ -586,8 +559,8 @@ def create_jobdef(config: Dict, fcl_path: str = 'template.fcl', job_args: List[s
     tbs, _, override_output_description = _parse_job_args(all_args, template_path, config)
     
     # Use provided outdir (simple logic matching Perl version)
-    final_outdir = Path(outdir) if outdir else None
-    out = final_outdir / f"cnf.{owner}.{desc}.{dsconf}.0.tar" if final_outdir else Path(f"cnf.{owner}.{desc}.{dsconf}.0.tar")
+    filename = f"cnf.{owner}.{desc}.{dsconf}.0.tar"
+    out = Path(outdir) / filename if outdir else Path(filename)
 
     if out.exists():
         out.unlink()

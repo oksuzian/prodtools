@@ -324,13 +324,12 @@ def process_single_entry(config, json_output=True, pushout=False, no_cleanup=Tru
         print(f"Generated: {parfile_name}")
     
     # Clean up temporary files AFTER job definition is created (unless --no-cleanup is specified)
-    if no_cleanup:
-        print("Temporary files kept (--no-cleanup specified)")
-    else:
+    if not no_cleanup:
         temp_files = ['inputs.txt', 'template.fcl', 'mubeamCat.txt', 'elebeamCat.txt', 'neutralsCat.txt', 'mustopCat.txt']
         for temp_file in temp_files:
-            if Path(temp_file).exists():
-                Path(temp_file).unlink()
+            temp_path = Path(temp_file)
+            if temp_path.exists():
+                temp_path.unlink()
                 print(f"Cleanup: {temp_file}")
     
     return result
