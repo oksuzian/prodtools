@@ -1,4 +1,6 @@
 """MCPServer (mcp SDK 2.x) registration for the write server."""
+import functools
+
 from prodtools_mcp_write import tools
 
 # Computed without touching the MCP SDK, so registration coverage is
@@ -29,12 +31,30 @@ def get_write_server_info():
     }
 
 
+def _forwarding(fn, ToolError):
+    """mcp 2.x sends a ToolError's text to the client and hides every other
+    exception behind "Error executing tool <name>". The tool functions
+    refuse with ValueError/RuntimeError whose text IS the remedy (which
+    file is missing, why mu2epro was refused, what the ledger holds), so
+    re-raise each as a ToolError carrying the same text."""
+    @functools.wraps(fn)
+    def wrapper(*args, **kwargs):
+        try:
+            return fn(*args, **kwargs)
+        except ToolError:
+            raise
+        except Exception as e:
+            raise ToolError(str(e)) from e
+    return wrapper
+
+
 def create_write_mcp_server():
     from mcp.server.mcpserver import MCPServer
+    from mcp.server.mcpserver.exceptions import ToolError
 
     mcp = MCPServer('prodtools-write')
     for name, fn in TOOL_FUNCTIONS.items():
-        mcp.tool(name=name)(fn)
+        mcp.tool(name=name)(_forwarding(fn, ToolError))
     return mcp
 
 

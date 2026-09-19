@@ -11051,6 +11051,39 @@ class TestWriteServerRegistration(unittest.TestCase):
                 f'{name} is not the function of that name in '
                 'prodtools_mcp_write.tools')
 
+    def test_forwarding_reraises_refusals_as_tool_error(self):
+        """mcp 2.x hides every exception but ToolError behind "Error
+        executing tool <name>", and the write tools refuse with
+        ValueError/RuntimeError whose text is the remedy. _forwarding
+        turns each into a ToolError carrying the same text, leaves a
+        ToolError alone, and keeps the wrapped signature (the SDK builds
+        the input schema from it)."""
+        import inspect
+        from prodtools_mcp_write.server import _forwarding
+
+        class ToolError(Exception):
+            pass
+
+        def push_cnf(json: str, run_as: str, confirm: bool = False):
+            if json == 'missing':
+                raise ValueError('push_cnf: --json config not found: missing')
+            if json == 'tool':
+                raise ToolError('already a ToolError')
+            return {'ok': json}
+
+        wrapped = _forwarding(push_cnf, ToolError)
+        self.assertEqual(wrapped('x', 'self'), {'ok': 'x'})
+        with self.assertRaises(ToolError) as cm:
+            wrapped('missing', 'self')
+        self.assertEqual(str(cm.exception), 'push_cnf: --json config not found: missing')
+        self.assertIsInstance(cm.exception.__cause__, ValueError)
+        with self.assertRaises(ToolError) as cm:
+            wrapped('tool', 'self')
+        self.assertEqual(str(cm.exception), 'already a ToolError')
+        self.assertIsNone(cm.exception.__cause__)
+        self.assertEqual(inspect.signature(wrapped), inspect.signature(push_cnf))
+        self.assertEqual(wrapped.__name__, 'push_cnf')
+
     @unittest.skipUnless(_HAVE_FASTMCP, 'mcp package (py3.10+) not installed')
     def test_advertised_names_match_registered_tools(self):
         """Live registration check, in addition to the static one above.
