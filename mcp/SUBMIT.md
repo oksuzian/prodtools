@@ -1,7 +1,7 @@
 # Submit your own grid jobs
 
 How to go from an installed prodtools to a dataset of your own, by asking
-an AI assistant. Setup is in [README.md](README.md) ("run your own");
+an AI assistant. Setup is in [README.md](README.md) ("1. Connect");
 that same `install.sh` sets up the second server used here,
 `prodtools-write`, and the same `.mcp.json` registers it.
 
@@ -160,5 +160,5 @@ The files are then in `nts.<user>.G4blSmoke.MyTest001.root`.
   and the next tick submits the same work again.
 - **`Error checking if token is valid`** in an input check means your
   kerberos ticket is missing or expired (`klist`, then `kinit`), or your
-  MCP client started the server without `KRB5CCNAME`; see "run your own"
-  in [README.md](README.md).
+  MCP client started the server without `KRB5CCNAME`; see
+  "Troubleshooting" in [README.md](README.md).

@@ -39,34 +39,22 @@ does this for Claude Code; for another client:
 
 Your own server runs as you, so it reads what your credentials can read.
 
-There is **no shared server yet.** The read-only server can run as one
-(see "Serve it to other people" below), and the plan is an instance on
-the collaboration's MCP host, but nobody runs it today. Once one exists,
-connecting will be a single line with nothing to install:
-
-    claude mcp add --transport http prodtools http://<host>:8008/mcp
-
-and it will answer questions only; submitting always needs your own
-install, because a shared server runs as its host account, not as you.
-
-Some clients start a server with a stripped environment (the MCP Python
-SDK passes only `HOME`, `LOGNAME`, `PATH`, `SHELL`, `TERM`, `USER`). That
-drops `KRB5CCNAME`, and with it your kerberos ticket: submitting then
-fails its input check with `Error checking if token is valid`. Pass the
-environment through — `"env": {"KRB5CCNAME": "..."}` in the config, or
-`env=dict(os.environ)` from the SDK. Claude Code passes its own.
-
 ### 2. Ask it things
 
 | Question | Tool it uses |
 | --- | --- |
-| "How is MDC2025au doing?" | `campaign_status(campaign="MDC2025au")` |
 | "What is running right now?" | `list_campaigns(state="active")` |
-| "What datasets does MDC2025au have?" | `find_datasets(campaign="MDC2025au")` |
-| "How many files and events in this dataset?" | `dataset_details(dataset="dig.mu2e....art")` |
-| "Where are its files on /pnfs?" | `dataset_files(dataset=..., location="tape")` |
-| "Does SAM know this file?" | `locate_file(name="cnf.mu2e....0.tar")` |
-| "What was this file made from?" | `trace_provenance(name=..., direction="up")` |
+| "How is MDC2025au doing?" | `campaign_status(campaign="MDC2025au")` |
+| "What CeEndpoint datasets exist for MDC2025?" | `find_datasets(pattern="%.mu2e.CeEndpoint%.MDC2025a%", require_files=true)` |
+| "How big is dts.mu2e.CeEndpoint.MDC2025ac.art?" | `dataset_details(dataset="dts.mu2e.CeEndpoint.MDC2025ac.art")` |
+| "Where are the files of sim.mu2e.MuminusStopsCat.MDC2025ac.art?" | `dataset_files(dataset="sim.mu2e.MuminusStopsCat.MDC2025ac.art", location="tape")` |
+| "Does SAM know this file, and where is it?" | `locate_file(name="sim.mu2e.MuminusStopsCat.MDC2025ac.001430_00000000.art")` |
+| "What was this file made from?" | `trace_provenance(name="dts.mu2e.CeEndpoint.MDC2025ac.001430_00000000.art", direction="up")` |
+
+Each of these is a real name and answers today. The CeEndpoint dataset
+has 2000 files and 5.4 million events; the stopped-muon sample is one
+7 GB file on tape; the CeEndpoint file traces back to it, and from there
+to the target-stop files it was concatenated from.
 
 Two things to know when you read the answers:
 
@@ -87,9 +75,9 @@ create or delete, no ledger change. Submitting is a separate server
 
 **[SUBMIT.md](SUBMIT.md)** walks through it: a small CeEndpoint sample
 on the newest MDC2025 release with nothing to edit, a run that stays out
-of SAM entirely, a G4beamline job, and the traps. It needs your own
-install (the "run your own" route above); the same `install.sh` sets up
-the second server, `prodtools-write`. The short version:
+of SAM entirely, a G4beamline job, and the traps. The install from
+"1. Connect" already set up the second server it uses,
+`prodtools-write`. The short version:
 
     push_cnf(json="/exp/mu2e/app/users/<user>/prodtools/data/examples/ceendpoint.json",
              desc="CeEndpoint", dsconf="MDC2025ax", slice_size=3, run_as="self")
@@ -136,6 +124,19 @@ missing or expired token shows up as `state: "unknown"`, never as zero.
 Only the read-only server is servable this way. `prodtools-write` stays
 stdio: it submits as mu2epro behind `ksu`, `confirm=true` and a
 PreToolUse hook, none of which survives being reached over a port.
+
+### A shared server: planned, not running
+
+Nobody runs a shared instance today; everyone installs their own. The
+plan is one on the collaboration's MCP host. When it exists, connecting
+will need no install:
+
+    claude mcp add --transport http prodtools http://<host>:8008/mcp
+
+or, for other MCP clients,
+`{"mcpServers": {"prodtools": {"type": "http", "url": "http://<host>:8008/mcp"}}}`.
+It will answer questions only. Submitting always needs your own install,
+because a shared server runs as its host account, not as you.
 
 ## `prodtools-write`
 
@@ -240,3 +241,14 @@ is still not reachable through MCP; `user` is validated as a UNIX login,
 not a path. Use the CLI for those:
 
     bash bin/submissions --db /exp/mu2e/data/users/<them>/prodtools/submissions.db status
+
+## Troubleshooting
+
+**`Error checking if token is valid`** in an input check. Your kerberos
+ticket is missing or expired: `klist`, then `kinit`. If the ticket is
+fine, your MCP client started the server without it: some clients start
+a server with a stripped environment (the MCP Python SDK passes only
+`HOME`, `LOGNAME`, `PATH`, `SHELL`, `TERM`, `USER`), which drops
+`KRB5CCNAME`. Pass the environment through — `"env": {"KRB5CCNAME":
+"..."}` in the client config, or `env=dict(os.environ)` from the SDK.
+Claude Code passes its own, so it is not affected.
