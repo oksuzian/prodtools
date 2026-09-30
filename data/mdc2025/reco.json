@@ -303,5 +303,22 @@
             "inloc": "tape",
             "outloc": {"*.art": "tape"},
             "simjob_setup": "/cvmfs/mu2e.opensciencegrid.org/Musings/SimJob/MDC2025au/setup.sh"
+        },
+        {
+            "dsconf": "MDC2025ax_best_v1_1_MDS3e",
+            "desc": "ensembleOnSpill",
+            "tarball_append": "-reco",
+            "fcl": "Production/JobConfig/recoMC/OnSpill.fcl",
+            "input_data": {
+                "dig.mu2e.ensembleOnSpill.MDC2025ax_best_v1_1_MDS3e.art": 1
+            },
+            "fcl_overrides": {
+                "outputs.LoopHelixOutput.fileName": "mcs.owner.{desc}.version.sequencer.art",
+                "services.DbService.purpose": "Sim_best",
+                "services.DbService.version": "v1_1"
+            },
+            "inloc": "tape",
+            "outloc": {"*.art": "tape"},
+            "simjob_setup": "/cvmfs/mu2e.opensciencegrid.org/Musings/SimJob/MDC2025ax/setup.sh"
         }
 ]
